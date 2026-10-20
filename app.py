@@ -1,5 +1,8 @@
 """Gold stock-transfer monitor — desktop build.
 
+Session 3 Part A adaptation: adds an "Explore one country" view to the
+Declared tab (country selector + monthly purchases and sales).
+
 Run:  python ingest.py --synthetic   (once, or --all for live data)
       streamlit run app.py
 
@@ -116,7 +119,7 @@ def endlabel(fig, x, y, text, color=dz.FAINT):
 
 def chart(fig, h):
     fig.update_layout(height=h)
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 def spark(vals, color, w=76, h=20):
@@ -286,6 +289,34 @@ with tabI:
                    "faster than the ground refills it. The space between the "
                    "lines is mine supply born outside the circuit (China, "
                    "Russia, Uzbekistan, Kazakhstan).")
+
+# ======================================================= EXPLORE ONE COUNTRY =
+# Adaptation (Session 3 Part A): the ranking above answers "who bought or sold
+# more over the last 12 months?"; this view answers "when did one country buy
+# or sell?" over the whole sample, using the same declared.csv table.
+with tabD:
+    st.subheader("Explore one country")
+    countries = t12.index.tolist()            # same order as the ranking
+    country = st.selectbox("Choose a country", countries,
+                           index=countries.index(top_buy))
+    country_data = declared[declared["country"] == country].sort_values("date")
+    total = country_data.net_purchases_t.sum()
+    last12 = t12[country]
+    start, end = country_data.date.min(), country_data.date.max()
+    st.caption(f"Monthly net purchases (+) and sales (−) in tonnes, "
+               f"{fmt(start)} to {fmt(end)}: {total:+,.0f} t over the whole "
+               f"sample, {last12:+,.0f} t in the latest 12 months (the period "
+               f"the ranking uses). Sample data.")
+    fig = px.bar(country_data, x="date", y="net_purchases_t",
+                 labels={"date": "Month", "net_purchases_t": "Tonnes"})
+    # keep the country's colour from every other panel; sales drawn lighter
+    fig.update_traces(marker_color=[dz.hue(country) if v >= 0 else dz.GHOST
+                                    for v in country_data.net_purchases_t],
+                      hovertemplate="%{x|%b %Y}: %{y:+.1f} t<extra></extra>")
+    fig.add_hline(y=0, line_color=dz.FAINT, line_width=1)
+    events(fig, label=False)
+    fig.update_yaxes(title="tonnes / month")
+    chart(fig, 330)
 
 st.caption("Sources when live: COMEX front-month futures (GC=F), FRED DFII10, "
            "GLD and IAU daily bar lists, IMF International Financial "
